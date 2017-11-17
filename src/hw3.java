@@ -28,9 +28,12 @@ import populate.Populate;
 public class hw3 extends JFrame {
 
     public static final String DATE_FORMAT = "yyyy-MM-dd";
-    private static HashSet<String> mainCategoriesSet = new HashSet();
-    private static HashSet<String> subCategoriesSet = new HashSet();
-    private static HashSet<String> attributesSet = new HashSet();
+    private static HashSet<String> selectedMainCategoriesSet = new HashSet();
+    private static HashSet<String> allSubCategoriesSet = new HashSet();
+    private static HashSet<String> selectedSubCategoriesSet = new HashSet();
+    private static HashSet<String> allAttributesSet = new HashSet();
+    private static HashSet<String> selectedAttributesSet = new HashSet();
+
     private static StringBuilder mainCategoriesString = new StringBuilder();
     private static StringBuilder subCategoriesString = new StringBuilder();
     private static StringBuilder attributesString = new StringBuilder();
@@ -78,13 +81,13 @@ public class hw3 extends JFrame {
                             JCheckBox mc = (JCheckBox) e.getSource();
                             String mainCategory = mc.getText();
                             if (mc.isSelected()) {
-                                mainCategoriesSet.add(mainCategory);
+                                selectedMainCategoriesSet.add(mainCategory);
                             } else {
-                                mainCategoriesSet.remove(mainCategory);
+                                selectedMainCategoriesSet.remove(mainCategory);
                             }
                             // get mainCategories from hashSet to arrayList
                             mainCategoriesString = new StringBuilder();
-                            Iterator<String> it = mainCategoriesSet.iterator();
+                            Iterator<String> it = selectedMainCategoriesSet.iterator();
                             while (it.hasNext()) {
                                 mainCategoriesString.append("'").append(it.next()).append("',");
                             }
@@ -124,6 +127,9 @@ public class hw3 extends JFrame {
     }
 
     private String getAndQuery(String name, HashSet<String> values) {
+        if (values.isEmpty()) {
+            return "1 = 0";
+        }
         StringBuilder sql = new StringBuilder();
         boolean first = true;
         for (String value : values) {
@@ -134,12 +140,16 @@ public class hw3 extends JFrame {
             }
             sql.append(name);
             sql.append(" = ");
-            sql.append(value);
+            sql.append("\"").append(value).append("\"");
+
         }
         return sql.toString();
     }
 
     private String getOrQuery(String name, HashSet<String> values) {
+        if (values.isEmpty()) {
+            return "1 = 0";
+        }
         StringBuilder sql = new StringBuilder();
         sql.append(name);
         sql.append(" in (");
@@ -150,51 +160,38 @@ public class hw3 extends JFrame {
             } else {
                 sql.append(" , ");
             }
-
-            sql.append(value);
+            sql.append("\"").append(value).append("\"");
         }
         sql.append(")");
         return sql.toString();
+    }
+
+    private String getQuery(String name, HashSet<String> values) {
+        return getOrQuery(name, values);
     }
 
     private void updateSubCategories() throws SQLException, ClassNotFoundException {
         try (Connection connection = Populate.getConnect()) {
             sCategoryListPanel.removeAll();
             System.out.println("Updating subCategories...");
-
-            StringBuilder sql;
             PreparedStatement preparedStatement;
             ResultSet rs;
-
-            ArrayList<HashSet<String>> subCategories = new ArrayList<>();
-            for (String mc : mainCategoriesSet) {
-                sql = new StringBuilder();
-                sql.append("SELECT DISTINCT sc.subCategory").append("\n")
-                        .append("FROM SubCategory sc, MainCategory mc").append("\n")
-                        .append("WHERE sc.business_id = mc.business_id AND mc.mainCategory = '").append(mc).append("'\n")
-                        .append("ORDER BY sc.subCategory");
-                preparedStatement = connection.prepareStatement(sql.toString());
-                rs = preparedStatement.executeQuery();
-                HashSet<String> scs = new HashSet<>();
-                while (rs.next()) {
-                    String subCategory = rs.getString(rs.findColumn("subCategory"));
-                    scs.add(subCategory);
-                }
-                subCategories.add(scs);
-                rs.close();
-                preparedStatement.close();
+            StringBuilder sql = new StringBuilder();
+            sql.append("SELECT DISTINCT sc.subCategory").append("\n")
+                    .append("FROM SubCategory sc, MainCategory mc").append("\n")
+                    .append("WHERE sc.business_id = mc.business_id AND ")
+                    .append(getQuery("mc.mainCategory", selectedMainCategoriesSet)).append("\n")
+                    .append("ORDER BY sc.subCategory");
+            System.out.println("DEBUG=========== select subCategories: " + sql.toString() + "\n");
+            preparedStatement = connection.prepareStatement(sql.toString());
+            rs = preparedStatement.executeQuery();
+            while (rs.next()) {
+                String subCategory = rs.getString(rs.findColumn("subCategory"));
+                allSubCategoriesSet.add(subCategory);
             }
-            HashSet<String> set = new HashSet<>();
-            if (!subCategories.isEmpty()) {
-                set.addAll(subCategories.get(0));
-            }
-            subCategories.forEach((seti) -> {
-                // TODO: and/or
-                set.retainAll(seti);
-            });
-            List<String> subCategoriesList = new ArrayList(set);
-            Collections.sort(subCategoriesList);
-            for (String scName : subCategoriesList) {
+            rs.close();
+            preparedStatement.close();
+            for (String scName : allSubCategoriesSet) {
                 JCheckBox sc = new JCheckBox(scName);
                 sc.addMouseListener(new MouseListener() {
                     @Override
@@ -202,12 +199,12 @@ public class hw3 extends JFrame {
                         JCheckBox sc = (JCheckBox) e.getSource();
                         String subCategory = sc.getText();
                         if (sc.isSelected()) {
-                            subCategoriesSet.add(subCategory);
+                            selectedSubCategoriesSet.add(subCategory);
                         } else {
-                            subCategoriesSet.remove(subCategory);
+                            selectedSubCategoriesSet.remove(subCategory);
                         }
                         subCategoriesString.setLength(0);
-                        Iterator<String> it = subCategoriesSet.iterator();
+                        Iterator<String> it = selectedSubCategoriesSet.iterator();
                         while (it.hasNext()) {
                             subCategoriesString.append("'").append(it.next()).append("',");
                         }
@@ -254,40 +251,23 @@ public class hw3 extends JFrame {
             StringBuilder sql = new StringBuilder();
             PreparedStatement preparedStatement;
             ResultSet rs;
+            sql.append("SELECT a.attribute\n")
+                    .append("FROM Attribute a, MainCategory mc, SubCategory sc\n")
+                    .append("WHERE a.business_id = mc.business_id AND a.business_id = sc.business_id")
+                    .append(" AND ").append(getQuery("mc.mainCategory", selectedMainCategoriesSet)).append(" AND ")
+                    .append(getQuery("sc.subCategory", selectedSubCategoriesSet)).append("\n")
+                    .append("ORDER BY a.attribute\n");
+            System.out.println("DEBUG============== select attributes:\n" + sql.toString());
+            preparedStatement = connection.prepareStatement(sql.toString());
+            rs = preparedStatement.executeQuery();
+            while (rs.next()) {
+                String attribute = rs.getString(rs.findColumn("attribute"));
+                allAttributesSet.add(attribute);
+            }
+            rs.close();
+            preparedStatement.close();
 
-            HashMap<String, Integer> attributesHash = new HashMap();
-            ArrayList<HashSet<String>> attributes = new ArrayList<>();
-            for (String mc : mainCategoriesSet) {
-                for (String sc : subCategoriesSet) {
-                    sql.setLength(0);
-                    sql.append("SELECT a.attribute\n")
-                            .append("FROM Attribute a, MainCategory mc, SubCategory sc\n")
-                            .append("WHERE a.business_id = mc.business_id AND a.business_id =  sc.business_id")
-                            .append(" AND mc.mainCategory = '").append(mc).append("' AND sc.subCategory = '").append(sc).append("'\n")
-                            .append("ORDER BY a.attribute\n");
-//                    System.out.println("DEBUG============== select attributes: " + sql.toString());
-                    preparedStatement = connection.prepareStatement(sql.toString());
-                    rs = preparedStatement.executeQuery();
-                    HashSet<String> attributesSet = new HashSet<>();
-                    while (rs.next()) {
-                        String attribute = rs.getString(rs.findColumn("attribute"));
-                        attributesSet.add(attribute);
-                    }
-                    attributes.add(attributesSet);
-                    rs.close();
-                    preparedStatement.close();
-                }
-            }
-            HashSet<String> aset = new HashSet<>();
-            if (!attributes.isEmpty()) {
-                aset.addAll(attributes.get(0));
-            }
-            for (HashSet<String> a : attributes) {
-                aset.retainAll(a);
-            }
-            List<String> attributesList = new ArrayList<>(aset);
-            Collections.sort(attributesList);
-            for (String aName : attributesList) {
+            for (String aName : allAttributesSet) {
                 JCheckBox a = new JCheckBox(aName);
                 a.addMouseListener(new MouseListener() {
                     @Override
@@ -295,12 +275,12 @@ public class hw3 extends JFrame {
                         JCheckBox a = (JCheckBox) e.getSource();
                         String attribute = a.getText();
                         if (a.isSelected()) {
-                            attributesSet.add(attribute);
+                            selectedAttributesSet.add(attribute);
                         } else {
-                            attributesSet.remove(attribute);
+                            selectedAttributesSet.remove(attribute);
                         }
                         attributesString.setLength(0);
-                        Iterator<String> it = attributesSet.iterator();
+                        Iterator<String> it = selectedAttributesSet.iterator();
                         while (it.hasNext()) {
                             attributesString.append("'").append(it.next()).append("',");
                         }
