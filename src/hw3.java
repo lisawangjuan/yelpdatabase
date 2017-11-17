@@ -133,6 +133,7 @@ public class hw3 extends JFrame {
         StringBuilder sql = new StringBuilder();
         boolean first = true;
         for (String value : values) {
+            value = value.replace("'", "''");
             if (first) {
                 first = false;
             } else {
@@ -140,7 +141,7 @@ public class hw3 extends JFrame {
             }
             sql.append(name);
             sql.append(" = ");
-            sql.append("\"").append(value).append("\"");
+            sql.append("'").append(value).append("'");
 
         }
         return sql.toString();
@@ -155,12 +156,13 @@ public class hw3 extends JFrame {
         sql.append(" in (");
         boolean first = true;
         for (String value : values) {
+            value = value.replace("'", "''");
             if (first) {
                 first = false;
             } else {
                 sql.append(" , ");
             }
-            sql.append("\"").append(value).append("\"");
+            sql.append("'").append(value).append("'");
         }
         sql.append(")");
         return sql.toString();
@@ -183,6 +185,7 @@ public class hw3 extends JFrame {
                     .append(getQuery("mc.mainCategory", selectedMainCategoriesSet)).append("\n")
                     .append("ORDER BY sc.subCategory");
             System.out.println("DEBUG=========== select subCategories: " + sql.toString() + "\n");
+            allSubCategoriesSet.clear();
             preparedStatement = connection.prepareStatement(sql.toString());
             rs = preparedStatement.executeQuery();
             while (rs.next()) {
@@ -260,6 +263,7 @@ public class hw3 extends JFrame {
             System.out.println("DEBUG============== select attributes:\n" + sql.toString());
             preparedStatement = connection.prepareStatement(sql.toString());
             rs = preparedStatement.executeQuery();
+            allAttributesSet.clear();
             while (rs.next()) {
                 String attribute = rs.getString(rs.findColumn("attribute"));
                 allAttributesSet.add(attribute);
