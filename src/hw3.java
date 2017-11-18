@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
@@ -10,14 +5,12 @@ import javax.swing.*;
 //import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.sql.Blob;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -52,22 +45,31 @@ public class hw3 extends JFrame {
         }
     }
 
-    public void ERROR(String msg) {
-//        queryTextArea.append(msg);
-    }
-
     private void init() throws SQLException, ClassNotFoundException {
         System.out.println("+++init+++");
+        // lisening to resultTable and get the information of review
+        resultTable.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 1) {
+                    JTable target = (JTable) e.getSource();
+                    int row = target.getSelectedRow();
+                    String id = resultTable.getModel().getValueAt(row, 0).toString();
+                    try {
+                        showReview(id);
+                    } catch (SQLException ex) {
+                        Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
+                    } catch (ClassNotFoundException ex) {
+                        Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
+        });
+
         try (Connection connection = Populate.getConnect();) {
             StringBuilder sql = new StringBuilder();
             PreparedStatement preparedStatement;
             ResultSet rs;
 
-            //init radioButton
-//            ButtonGroup group = new ButtonGroup();
-//            group.add(businessRadioButton);
-//            group.add(userRadioButton);
-            //init mainCategory
             sql.append("SELECT DISTINCT mainCategory FROM MainCategory ORDER BY mainCategory");
             preparedStatement = connection.prepareStatement(sql.toString());
             rs = preparedStatement.executeQuery();
@@ -169,7 +171,11 @@ public class hw3 extends JFrame {
     }
 
     private String getQuery(String name, HashSet<String> values) {
-        return getOrQuery(name, values);
+        if (jRadioButtonOr.isSelected()) {
+            return getOrQuery(name, values);
+        } else {
+            return getAndQuery(name, values);
+        }
     }
 
     private void updateSubCategories() throws SQLException, ClassNotFoundException {
@@ -319,7 +325,61 @@ public class hw3 extends JFrame {
     }
 
     private void updateItem() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        DefaultTableModel defaultTableModel;
+        String[][] data;
+
+        try (Connection connection = Populate.getConnect();) {
+            PreparedStatement preparedStatement;
+            ResultSet rs;
+            String query = getBusinessQueryString().toString();
+
+            preparedStatement = connection.prepareStatement(query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            rs = preparedStatement.executeQuery();
+
+            rs.last();
+            ResultSetMetaData rsmd = rs.getMetaData();
+            int rowCount = rs.getRow();
+            int columnCount = rsmd.getColumnCount();
+            data = new String[rowCount][columnCount];
+            String[] columnNames = new String[columnCount];
+
+            SortedSet<String> cities = new TreeSet<String>();
+
+            // get column names
+            for (int i = 1; i <= columnCount; i++) {
+                columnNames[i - 1] = rsmd.getColumnName(i);
+            }
+
+            rs.beforeFirst();
+            for (int i = 0; i < rowCount; i++) {
+                if (rs.next()) {
+                    for (int j = 1; j <= columnCount; j++) {
+                        if (rsmd.getColumnName(j).equals("CITY")) {
+                            cities.add(rs.getString(j))
+                        }
+                        data[i][j - 1] = rs.getString(j);
+                    }
+                }
+            }
+
+            // update city selection.
+            location.removeAllItems();
+            location.addItem("");
+            for (String city : cities) {
+                location.addItem(city);
+            }
+            location.updateUI();
+
+            rs.close();
+            preparedStatement.close();
+            defaultTableModel = new DefaultTableModel(data, columnNames);
+            resultTable.removeAll();
+            resultTable.setModel(defaultTableModel);
+        } catch (SQLException ex) {
+            Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -331,6 +391,7 @@ public class hw3 extends JFrame {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
+        andor = new javax.swing.ButtonGroup();
         View = new javax.swing.JPanel();
         businessPanel = new javax.swing.JPanel();
         categoriesPanel = new javax.swing.JPanel();
@@ -360,10 +421,11 @@ public class hw3 extends JFrame {
         to = new javax.swing.JComboBox<>();
         jLabel4 = new javax.swing.JLabel();
         location = new javax.swing.JComboBox<>();
+        jRadioButtonOr = new javax.swing.JRadioButton();
+        jRadioButtonAnd = new javax.swing.JRadioButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setBackground(new java.awt.Color(0, 0, 153));
-        setPreferredSize(null);
 
         View.setBackground(new java.awt.Color(255, 204, 255));
         View.setToolTipText("hw3");
@@ -506,6 +568,11 @@ public class hw3 extends JFrame {
                 queryButtonMouseClicked(evt);
             }
         });
+        queryButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                queryButtonActionPerformed(evt);
+            }
+        });
 
         queryButton1.setBackground(new java.awt.Color(255, 0, 255));
         queryButton1.setText("Close");
@@ -516,187 +583,186 @@ public class hw3 extends JFrame {
             }
         });
 
-        day.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] {"", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }));
-        day.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                dayActionPerformed(evt);
-            }
-        });
+        day.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] {
+            "",
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday" }));
+day.addActionListener(new java.awt.event.ActionListener() {
+    public void actionPerformed(java.awt.event.ActionEvent evt) {
+        dayActionPerformed(evt);
+    }
+    });
 
-        jLabel1.setText("Day of the week:");
+    jLabel1.setText("Day of the week:");
 
-        jLabel2.setText("From:");
+    jLabel2.setText("From:");
 
-        from.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] {  }));
-        from.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                fromActionPerformed(evt);
-            }
-        });
+    from.setModel(new javax.swing.DefaultComboBoxModel<>(
+        new String[] { "",
+            "00:00" ,
+            "01:00" ,
+            "02:00" ,
+            "03:00" ,
+            "04:00" ,
+            "05:00" ,
+            "06:00" ,
+            "07:00" ,
+            "08:00" ,
+            "09:00" ,
+            "10:00" ,
+            "11:00" ,
+            "12:00" ,
+            "13:00" ,
+            "14:00" ,
+            "15:00" ,
+            "16:00" ,
+            "17:00" ,
+            "19:00" ,
+            "20:00" ,
+            "21:00" ,
+            "22:00" ,
+            "23:00" ,
+            "24:00"  }));
+from.addActionListener(new java.awt.event.ActionListener() {
+    public void actionPerformed(java.awt.event.ActionEvent evt) {
+        fromActionPerformed(evt);
+    }
+    });
 
-        jLabel3.setText("To:");
+    jLabel3.setText("To:");
 
-        to.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { }));
+    to.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "",
+        "00:00" ,
+        "01:00" ,
+        "02:00" ,
+        "03:00" ,
+        "04:00" ,
+        "05:00" ,
+        "06:00" ,
+        "07:00" ,
+        "08:00" ,
+        "09:00" ,
+        "10:00" ,
+        "11:00" ,
+        "12:00" ,
+        "13:00" ,
+        "14:00" ,
+        "15:00" ,
+        "16:00" ,
+        "17:00" ,
+        "19:00" ,
+        "20:00" ,
+        "21:00" ,
+        "22:00" ,
+        "23:00" ,
+        "24:00"  }));
 
-        jLabel4.setText("Search For:");
+jLabel4.setText("Location:");
 
-        location.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] {  }));
+location.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "" }));
 
-        javax.swing.GroupLayout SelectionLayout = new javax.swing.GroupLayout(Selection);
-        Selection.setLayout(SelectionLayout);
-        SelectionLayout.setHorizontalGroup(
-            SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(SelectionLayout.createSequentialGroup()
-                .addGap(18, 18, 18)
-                .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel1)
-                    .addComponent(day, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(57, 57, 57)
-                .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jLabel2)
-                    .addComponent(from, javax.swing.GroupLayout.PREFERRED_SIZE, 86, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(52, 52, 52)
-                .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(SelectionLayout.createSequentialGroup()
+andor.add(jRadioButtonOr);
+jRadioButtonOr.setSelected(true);
+jRadioButtonOr.setText("OR");
+jRadioButtonOr.addActionListener(new java.awt.event.ActionListener() {
+public void actionPerformed(java.awt.event.ActionEvent evt) {
+    jRadioButtonOrActionPerformed(evt);
+    }
+    });
+
+    andor.add(jRadioButtonAnd);
+    jRadioButtonAnd.setText("AND");
+    jRadioButtonAnd.addActionListener(new java.awt.event.ActionListener() {
+        public void actionPerformed(java.awt.event.ActionEvent evt) {
+            jRadioButtonAndActionPerformed(evt);
+        }
+    });
+
+    javax.swing.GroupLayout SelectionLayout = new javax.swing.GroupLayout(Selection);
+    Selection.setLayout(SelectionLayout);
+    SelectionLayout.setHorizontalGroup(
+        SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+        .addGroup(SelectionLayout.createSequentialGroup()
+            .addGap(18, 18, 18)
+            .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(jLabel1)
+                .addComponent(day, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE))
+            .addGap(57, 57, 57)
+            .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(jLabel2)
+                .addComponent(from, javax.swing.GroupLayout.PREFERRED_SIZE, 86, javax.swing.GroupLayout.PREFERRED_SIZE))
+            .addGap(52, 52, 52)
+            .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGroup(SelectionLayout.createSequentialGroup()
+                    .addComponent(jLabel3)
+                    .addGap(148, 148, 148)
+                    .addComponent(jLabel4, javax.swing.GroupLayout.DEFAULT_SIZE, 98, Short.MAX_VALUE)
+                    .addGap(172, 172, 172))
+                .addGroup(SelectionLayout.createSequentialGroup()
+                    .addComponent(to, javax.swing.GroupLayout.PREFERRED_SIZE, 89, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(location, javax.swing.GroupLayout.PREFERRED_SIZE, 155, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGap(73, 73, 73)))
+            .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addComponent(jRadioButtonOr)
+                .addComponent(jRadioButtonAnd))
+            .addGap(42, 42, 42)
+            .addComponent(queryButton, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addGap(18, 18, 18)
+            .addComponent(queryButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addGap(32, 32, 32))
+    );
+    SelectionLayout.setVerticalGroup(
+        SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+        .addGroup(SelectionLayout.createSequentialGroup()
+            .addGap(16, 16, 16)
+            .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, SelectionLayout.createSequentialGroup()
+                    .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(queryButton)
+                        .addComponent(queryButton1))
+                    .addGap(26, 26, 26))
+                .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, SelectionLayout.createSequentialGroup()
+                    .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(jLabel1)
+                        .addComponent(jLabel2)
                         .addComponent(jLabel3)
-                        .addGap(148, 148, 148)
                         .addComponent(jLabel4, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addGap(307, 307, 307))
-                    .addGroup(SelectionLayout.createSequentialGroup()
-                        .addComponent(to, javax.swing.GroupLayout.PREFERRED_SIZE, 89, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(location, javax.swing.GroupLayout.PREFERRED_SIZE, 155, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(208, 208, 208)))
-                .addComponent(queryButton, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(queryButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 88, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(32, 32, 32))
-        );
-        SelectionLayout.setVerticalGroup(
-            SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(SelectionLayout.createSequentialGroup()
-                .addGap(20, 20, 20)
-                .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, SelectionLayout.createSequentialGroup()
-                        .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(queryButton)
-                            .addComponent(queryButton1))
-                        .addGap(26, 26, 26))
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, SelectionLayout.createSequentialGroup()
-                        .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(jLabel1)
-                            .addComponent(jLabel2)
-                            .addComponent(jLabel3)
-                            .addComponent(jLabel4, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(day, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(from, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(to, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(location, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addContainerGap())))
-        );
+                        .addComponent(jRadioButtonOr))
+                    .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                    .addGroup(SelectionLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                        .addComponent(day, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(from, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(to, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(location, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(jRadioButtonAnd))
+                    .addContainerGap())))
+    );
 
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
-        getContentPane().setLayout(layout);
-        layout.setHorizontalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(View, javax.swing.GroupLayout.PREFERRED_SIZE, 1063, javax.swing.GroupLayout.PREFERRED_SIZE)
-            .addComponent(Selection, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-        );
-        layout.setVerticalGroup(
-            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
-                .addComponent(View, javax.swing.GroupLayout.PREFERRED_SIZE, 530, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, 0)
-                .addComponent(Selection, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE))
-        );
+    javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
+    getContentPane().setLayout(layout);
+    layout.setHorizontalGroup(
+        layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+        .addComponent(View, javax.swing.GroupLayout.PREFERRED_SIZE, 1063, javax.swing.GroupLayout.PREFERRED_SIZE)
+        .addComponent(Selection, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+    );
+    layout.setVerticalGroup(
+        layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+        .addGroup(layout.createSequentialGroup()
+            .addComponent(View, javax.swing.GroupLayout.PREFERRED_SIZE, 530, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addGap(0, 0, 0)
+            .addComponent(Selection, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE))
+    );
 
-        pack();
+    pack();
     }// </editor-fold>//GEN-END:initComponents
 
     private void queryButtonMouseClicked(MouseEvent evt) {//GEN-FIRST:event_queryButtonMouseClicked
-        // TODO add your handling code here:
-        DefaultTableModel defaultTableModel;
-        String[][] data;
-
-        try (Connection connection = Populate.getConnect();) {
-            StringBuilder query = new StringBuilder();
-            PreparedStatement preparedStatement;
-            ResultSet rs;
-//            queryTextArea.setText("<Show Query Here:> \n\n");
-            // if it's business turn
-            if (businessRadioButton.isSelected()) {
-                if (mainCategoriesString.length() == 0) {
-                    ERROR("ERROR: ON ACTION ON SELECT \"Category\"!\n\n");
-                    return;
-                } else {
-                    query = getBusinessQueryString();
-                }
-            } // if it's user turn
-            else if (userRadioButton.isSelected()) {
-                query = getUserQueryString();
-            } else {
-                ERROR("ERROR: ON ACTION SELECT BUSINESS INTERFACE OR USER INTERFACE!\n\n");
-                return;
-            }
-
-            if (query.length() == 0) {
-                ERROR("ERROR: NO ACTION!\n\n");
-                return;
-            }
-            preparedStatement = connection.prepareStatement(query.toString(), ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-            rs = preparedStatement.executeQuery();
-
-            rs.last();
-            ResultSetMetaData rsmd = rs.getMetaData();
-            int rowCount = rs.getRow();
-            int columnCount = rsmd.getColumnCount();
-            data = new String[rowCount][columnCount];
-            String[] columnNames = new String[columnCount];
-
-            // get column names
-            for (int i = 1; i <= columnCount; i++) {
-                columnNames[i - 1] = rsmd.getColumnName(i);
-            }
-
-            rs.beforeFirst();
-            for (int i = 0; i < rowCount; i++) {
-                if (rs.next()) {
-                    for (int j = 1; j <= columnCount; j++) {
-                        data[i][j - 1] = rs.getString(j);
-                    }
-                }
-            }
-            rs.close();
-            preparedStatement.close();
-            defaultTableModel = new DefaultTableModel(data, columnNames);
-            resultTable.setModel(defaultTableModel);
-            queryTextArea.append(query.toString());
-
-            // lisening to resultTable and get the information of review
-            resultTable.addMouseListener(new MouseAdapter() {
-                public void mouseClicked(MouseEvent e) {
-                    if (e.getClickCount() == 1) {
-                        JTable target = (JTable) e.getSource();
-                        int row = target.getSelectedRow();
-                        String id = resultTable.getModel().getValueAt(row, 1).toString();
-                        try {
-                            showReview(id);
-                        } catch (SQLException ex) {
-                            Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
-                        } catch (ClassNotFoundException ex) {
-                            Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                    }
-                }
-            });
-
-        } catch (SQLException ex) {
-            Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ClassNotFoundException ex) {
-            Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
-        }
     }//GEN-LAST:event_queryButtonMouseClicked
 
     private void queryButton1MouseClicked(MouseEvent evt) {//GEN-FIRST:event_queryButton1MouseClicked
@@ -711,109 +777,67 @@ public class hw3 extends JFrame {
         // TODO add your handling code here:
     }//GEN-LAST:event_fromActionPerformed
 
+    private void queryButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_queryButtonActionPerformed
+        updateItem();
+    }//GEN-LAST:event_queryButtonActionPerformed
+
+    private void jRadioButtonOrActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButtonOrActionPerformed
+        System.out.println("Change to OR");
+    }//GEN-LAST:event_jRadioButtonOrActionPerformed
+
+    private void jRadioButtonAndActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButtonAndActionPerformed
+        System.out.println("Change to AND");
+    }//GEN-LAST:event_jRadioButtonAndActionPerformed
+
     private StringBuilder getBusinessQueryString() {
         StringBuilder query = new StringBuilder();
 
         //get query from category
-        query.append("SELECT b.name, b.business_id, b.city, b.state, b.stars, mc.MainCategory\n")
+        query.append("SELECT b.*, mc.MainCategory\n")
                 .append("FROM Business b, MainCategory mc\n")
-                .append("WHERE b.business_id = mc.business_id AND mc.mainCategory IN (").append(mainCategoriesString).append(")\n");
+                .append("WHERE b.business_id = mc.business_id AND ").append(getQuery("mc.mainCategory", selectedMainCategoriesSet)).append("\n");
 
         //check subcategory and get query from subCategory
-        if (subCategoriesString.length() != 0) {
-            query.append("\nAND b.business_id IN (\n")
-                    .append("  SELECT bc.business_id\n")
-                    .append("  FROM SubCategory bc\n")
-                    .append("  WHERE bc.subCategory IN (").append(subCategoriesString).append(")\n")
-                    .append(")\n");
-        }
+        query.append("\nAND b.business_id IN (\n")
+                .append("  SELECT business_id\n")
+                .append("  FROM SubCategory \n")
+                .append("  WHERE ").append(getQuery("subCategory", selectedSubCategoriesSet)).append("\n")
+                .append(")\n");
 
-        //check star and votes and get query from review
-        boolean from = isValidDateFormat(fromTextField.getText());
-        boolean to = isValidDateFormat(fromTextField.getText());
-//        boolean stars = isNumeric(starTextField.getText()) && starComboBox.getSelectedIndex() > 0;
-//        boolean votes = isNumeric(votesTextField.getText()) && votesComboBox.getSelectedIndex() > 0;
-        if ((from && to) || stars || votes) {
+        //check subcategory and get query from subCategory
+        query.append("\nAND b.business_id IN (\n")
+                .append("  SELECT business_id\n")
+                .append("  FROM Attribute \n")
+                .append("  WHERE ").append(getQuery("attribute", selectedAttributesSet)).append("\n")
+                .append(")\n");
+
+        String dayStr = day.getSelectedItem().toString();
+        String fromStr = from.getSelectedItem().toString();
+        String toStr = to.getSelectedItem().toString();
+        String locationStr = location.getSelectedItem().toString();
+
+        if (!locationStr.isEmpty()) {
+            query.append("\nAND b.city = '")
+                    .append(locationStr)
+                    .append("'\n");
+        }
+        if (!dayStr.isEmpty() || !fromStr.isEmpty() || !toStr.isEmpty()) {
             query.append("\nAND b.business_id IN (\n")
-                    .append("  SELECT r.business_id\n")
-                    .append("  FROM Review r\n")
-                    .append("  WHERE r.business_id = r.business_id\n");
-            if (from && to) {
-                query.append("          AND r.review_date >= '").append(getDate(fromTextField.getText())).append("' AND r.review_date <= '").append(getDate(toTextField.getText())).append("'\n");
+                    .append("  SELECT business_id\n")
+                    .append("  FROM Hours \n")
+                    .append("  WHERE 1 = 1\n");
+            if (!dayStr.isEmpty()) {
+                query.append(" AND openDay = '").append(dayStr).append("'\n");
             }
-//            if (stars) {
-//                query.append("          AND r.stars ").append(starComboBox.getSelectedItem().toString()).append(" ").append(starTextField.getText()).append("\n");
-//            }
-//            if (votes) {
-//                query.append("          AND r.votes ").append(votesComboBox.getSelectedItem().toString()).append(" ").append(votesTextField.getText()).append("\n");
-//            }
+            if (!fromStr.isEmpty()) {
+                query.append(" AND closeTime > '").append(fromStr).append("'\n");
+            }
+            if (!toStr.isEmpty()) {
+                query.append(" AND openTime < '").append(toStr).append("'\n");
+            }
             query.append(")\n");
         }
-
         System.out.println("DEBUG==============business query: \n" + query.toString());
-        return query;
-    }
-
-    private StringBuilder getUserQueryString() {
-        StringBuilder query = new StringBuilder();
-        if (userSearchForComboBox.getSelectedIndex() < 1) {
-            return query;
-        }
-        boolean memberSince = isValidDateFormat(memberSinceTextField.getText());
-        boolean reviewCount = isNumeric(reviewCountTextField.getText()) && reviewCountComboBox.getSelectedIndex() > 0;
-        boolean numberOfFriends = isNumeric(numberOfFriendsTextField.getText()) && numberOfFriendsComboBox.getSelectedIndex() > 0;
-        boolean averageStars = isNumeric(averageStarsTextField.getText()) && averageStarsComboBox.getSelectedIndex() > 0;
-        boolean numberOfVotes = isNumeric(numberOfVotesTextField.getText()) && numberOfVotesComboBox.getSelectedIndex() > 0;
-        String selector = userSearchForComboBox.getSelectedItem().toString();
-        query.append("SELECT y.name, y.user_id, y.yelping_since, y.review_count, y.friend_count, y.average_stars, y.votes\n")
-                .append("FROM YelpUser y\n");
-        query.append("WHERE y.name = y.name");
-        if (memberSince || reviewCount || numberOfFriends || averageStars || numberOfVotes) {
-            //check Review Count and get value
-            if (memberSince) {
-                query.append(" ").append(selector)
-                        .append(" y.yelping_since >= '").append(getDate(memberSinceTextField.getText())).append("'");
-            }
-            if (reviewCount) {
-                query.append(" ").append(selector)
-                        .append(" y.review_count ").append(reviewCountComboBox.getSelectedItem()).append(" ").append(reviewCountTextField.getText());
-            }
-            if (numberOfFriends) {
-                query.append(" ").append(selector)
-                        .append(" y.friend_count ").append(numberOfFriendsComboBox.getSelectedItem()).append(" ").append(numberOfFriendsTextField.getText());
-            }
-            if (averageStars) {
-                query.append(" ").append(selector)
-                        .append(" y.average_stars ").append(averageStarsComboBox.getSelectedItem()).append(" ").append(averageStarsTextField.getText());
-            }
-            if (numberOfVotes) {
-                query.append(" ").append(selector)
-                        .append(" y.votes ").append(numberOfVotesComboBox.getSelectedItem()).append(" ").append(numberOfVotesTextField.getText());
-            }
-        }
-
-        //check star and votes and get query from review
-        boolean from = isValidDateFormat(fromTextField.getText());
-        boolean to = isValidDateFormat(toTextField.getText());
-        boolean star = isNumeric(starTextField.getText()) && starComboBox.getSelectedIndex() > 0;
-        boolean votes = isNumeric(votesTextField.getText()) && votesComboBox.getSelectedIndex() > 0;
-        if ((from && to) || star || votes) {
-            query.append("\n\nAND y.user_id IN (\n")
-                    .append("  SELECT r.user_id\n")
-                    .append("  FROM Review r\n")
-                    .append("  WHERE r.business_id = r.business_id\n");
-            if (from && to) {
-                query.append("          AND r.review_date >= '").append(fromTextField.getText()).append("' AND r.review_date <= '").append(toTextField.getText()).append("'");
-            }
-            if (star) {
-                query.append("          AND r.stars " + starComboBox.getSelectedItem().toString() + " " + starTextField.getText() + "\n");
-            }
-            if (votes) {
-                query.append("          AND r.votes" + votesComboBox.getSelectedItem().toString() + " " + votesTextField.getText() + "\n");
-            }
-            query.append(")\n");
-        }
-        System.out.println("DEBUG============== user query: \n" + query.toString());
         return query;
     }
 
@@ -834,23 +858,10 @@ public class hw3 extends JFrame {
             StringBuilder query = new StringBuilder();
             PreparedStatement preparedStatement;
             ResultSet rs;
-            query.append("SELECT y.name, r.business_id, r.user_id, r.review_date, r.stars, r.votes\n")
+            query.append("SELECT y.user_name, r.business_id, r.user_id, r.review_date, r.stars, r.text \n")
                     .append("FROM Review r, YelpUser y\n")
                     .append("WHERE r.user_id = y.user_id");
-            if (businessRadioButton.isSelected()) {
-                query.append(" AND r.business_id = '").append(id).append("'\n");
-            } else if (userRadioButton.isSelected()) {
-                query.append(" AND r.user_id = '").append(id).append("'\n");
-            }
-            if (isValidDateFormat(fromTextField.getText()) && isValidDateFormat(toTextField.getText())) {
-                query.append(" AND r.review_date >= '").append(getDate(fromTextField.getText())).append("' AND r.review_date <= '").append(getDate(toTextField.getText())).append("'");
-            }
-            if (isNumeric(starTextField.getText()) && starComboBox.getSelectedIndex() > 0) {
-                query.append(" AND r.stars ").append(starComboBox.getSelectedItem().toString()).append(" ").append(starTextField.getText()).append("\n");
-            }
-            if (isNumeric(votesTextField.getText()) && votesComboBox.getSelectedIndex() > 0) {
-                query.append(" AND r.votes ").append(votesComboBox.getSelectedItem().toString()).append(" ").append(votesTextField.getText()).append("\n");
-            }
+            query.append(" AND r.business_id = '").append(id).append("'\n");
             System.out.println("DEBUG================= review query: \n" + query.toString());
             preparedStatement = connection.prepareStatement(query.toString(), ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             rs = preparedStatement.executeQuery();
@@ -871,7 +882,13 @@ public class hw3 extends JFrame {
             for (int i = 0; i < rowCount; i++) {
                 if (rs.next()) {
                     for (int j = 1; j <= columnCount; j++) {
-                        data[i][j - 1] = rs.getString(j);
+                        try {
+                            data[i][j - 1] = rs.getString(j);
+                        } catch (SQLException e) {
+                            Blob blob = rs.getBlob(j);
+                            byte[] bdata = blob.getBytes(1, (int) blob.length());
+                            data[i][j - 1] = new String(bdata);
+                        }
                     }
                 }
             }
@@ -882,41 +899,6 @@ public class hw3 extends JFrame {
 
             reviewFrame.add(scrollpane);
         }
-    }
-
-    private boolean isNumeric(String s) {
-        if (s == null || s.length() == 0) {
-            return false;
-        }
-        try {
-            Integer num = Integer.parseInt(s);
-        } catch (NumberFormatException e) {
-            return false;
-        }
-        return true;
-    }
-
-    private static String getDate(String inDate) {
-        SimpleDateFormat formater = new SimpleDateFormat(DATE_FORMAT);
-        DateFormat format = new SimpleDateFormat(DATE_FORMAT, Locale.ENGLISH);
-        Date date = null;
-        try {
-            date = format.parse(inDate);
-        } catch (ParseException ex) {
-            Logger.getLogger(hw3.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return formater.format(date);
-    }
-
-    private static boolean isValidDateFormat(String inDate) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT);
-        dateFormat.setLenient(false);
-        try {
-            dateFormat.parse(inDate.trim());
-        } catch (ParseException pe) {
-            return false;
-        }
-        return true;
     }
 
     /**
@@ -961,6 +943,7 @@ public class hw3 extends JFrame {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel Selection;
     private javax.swing.JPanel View;
+    private javax.swing.ButtonGroup andor;
     private javax.swing.JLabel attributeLabel;
     private javax.swing.JPanel attributeListPanel;
     private javax.swing.JPanel attributePanel;
@@ -974,6 +957,8 @@ public class hw3 extends JFrame {
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
+    private javax.swing.JRadioButton jRadioButtonAnd;
+    private javax.swing.JRadioButton jRadioButtonOr;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JComboBox<String> location;
     private javax.swing.JPanel mCategoryListPanel;
