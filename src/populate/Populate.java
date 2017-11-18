@@ -12,51 +12,6 @@ import java.util.logging.Logger;
 import java.io.FileReader;
 
 
-class Hours {
-    String business_id;
-    String openDay;
-    String openTime;
-    String closeTime;
-
-    Hours(String business_id, String day, String openTime, String closeTime) {
-        this.business_id = business_id;
-        this.openDay = day;
-        this.openTime = openTime;
-        this.closeTime = closeTime;
-    }
-}
-
-class MainCategory {
-    String business_id;
-    String mainCategory;
-
-    MainCategory(String business_id, String mainCategory) {
-        this.business_id = business_id;
-        this.mainCategory = mainCategory;
-    }
-}
-
-class SubCategory {
-    String business_id;
-    String subcategory;
-
-    SubCategory(String business_id, String subcategory) {
-        this.business_id = business_id;
-        this.subcategory = subcategory;
-    }
-}
-
-
-class Attribute {
-    String business_id;
-    String attribute;
-
-    Attribute(String business_id, String attribute) {
-        this.business_id = business_id;
-        this.attribute = attribute;
-    }
-}
-
 public class Populate {
 
     private static final String DB_USER = "Scott";
@@ -68,20 +23,24 @@ public class Populate {
     private static final String REVIEW_JSON_FILE_PATH = "C:\\WangJuan\\SCU\\COEN280\\assignments\\homework3\\YelpDataset\\yelp_review.json";
     private static final String CHECKIN_JSON_FILE_PATH = "C:\\WangJuan\\SCU\\COEN280\\assignments\\homework3\\YelpDataset\\yelp_checkin.json";
 
-    public static List<Business> businesses = new ArrayList();
-    public static List<MainCategory> mainCategories = new ArrayList();
-    public static List<SubCategory> subCategories = new ArrayList();
-    public static List<Attribute> attributes = new ArrayList();
-    public static List<Hours> hours = new ArrayList();
+    /**
+     *
+     */
     public static HashSet<String> mainCategoriesHash = new HashSet();
 
+    /**
+     *
+     */
     public static void run() {
         try {
             init();
             parseAndInsertYelpUser();
             parseAndInsertBusiness();
-            parseAndInsertReview();
+            parseAndInsertAttribute();
+            parseAndInsertHours();
             parseAndInsertCheckIn();
+            parseAndInsertReview();
+            parseAndInsertMainAndSubCategory();
 
         } catch (SQLException ex) {
             Logger.getLogger(Populate.class.getName()).log(Level.SEVERE, null, ex);
@@ -94,10 +53,10 @@ public class Populate {
 
 
     private static void init() throws SQLException, ClassNotFoundException {
-        System.out.println("+++++++++++++ START initialization +++++++++++++");
+        System.out.println("START initialization");
         addMainCategories();
         cleanTable();
-        System.out.println("------------- END initialization -------------");
+        System.out.println("END initialization");
     }
 
     private static void addMainCategories() {
@@ -171,14 +130,14 @@ public class Populate {
             preparedStatement.executeUpdate();
             preparedStatement.close();
 
-            System.out.println("Clean Business table...");
-            sql = "DELETE FROM Business";
+            System.out.println("Clean Checkin table...");
+            sql = "DELETE FROM Checkin";
             preparedStatement = connection.prepareStatement(sql);
             preparedStatement.executeUpdate();
             preparedStatement.close();
 
-            System.out.println("Clean Checkin table...");
-            sql = "DELETE FROM Checkin";
+            System.out.println("Clean Business table...");
+            sql = "DELETE FROM Business";
             preparedStatement = connection.prepareStatement(sql);
             preparedStatement.executeUpdate();
             preparedStatement.close();
@@ -195,25 +154,25 @@ public class Populate {
             String sql;
             PreparedStatement preparedStatement = null;
             JSONParser parser = new JSONParser();
-            // parse business data
 
+            // parse business data
             while ((line = reader.readLine()) != null) {
                 JSONObject obj = (JSONObject) parser.parse(line);
                 String business_id = (String) obj.get("business_id");
                 String address = (String) obj.get("full_address");
                 String city = (String) obj.get("city");
                 Integer review_count = ((Long) obj.get("review_count")).intValue();
-                String name = (String) obj.get("name");
-                String state = (String) obj.get("state");
+                String business_name = (String) obj.get("name");
+                String b_state = (String) obj.get("state");
                 double stars = (double) obj.get("stars");
-                // insert user data
-                sql = "INSERT INTO Business (business_id, name, city, state, address, stars, review_count) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
+                // insert business data
+                sql = "INSERT INTO Business (business_id, business_name, city, b_state, address, stars, review_count) VALUES (?, ?, ?, ?, ?, ?, ?)";
                 preparedStatement = connection.prepareStatement(sql);
                 preparedStatement.setString(1, business_id);
-                preparedStatement.setString(2, name);
+                preparedStatement.setString(2, business_name);
                 preparedStatement.setString(3, city);
-                preparedStatement.setString(4, state);
+                preparedStatement.setString(4, b_state);
                 preparedStatement.setString(5, address);
                 preparedStatement.setDouble(6, stars);
                 preparedStatement.setInt(7, review_count);
@@ -243,23 +202,25 @@ public class Populate {
                 JSONArray arr = (JSONArray) obj.get("categories");
                 for (int i = 0; i < arr.size(); i++) {
                     String category = (String) arr.get(i);
-                    if (mainCategoriesHash.contains(category)) {
-//                        mainCategories.add(new MainCategory(business_id, category));
-                        // insert MainCategory data
-                        sql = "INSERT INTO MainCategory (business_id, category) VALUES (?, ?)";
 
+                    // insert MainCategory data
+                    if (mainCategoriesHash.contains(category)) {
+                        String mainCategory = category;
+                        sql = "INSERT INTO MainCategory (business_id, mainCategory) VALUES (?, ?)";
                         preparedStatement = connection.prepareStatement(sql);
                         preparedStatement.setString(1, business_id);
-                        preparedStatement.setString(2, category);
+                        preparedStatement.setString(2, mainCategory);
                         preparedStatement.executeUpdate();
                         preparedStatement.close();
-                    } else {
-//                        subCategories.add(new SubCategory(business_id, category));
-                        sql = "INSERT INTO SubCategory (business_id, category) VALUES (?, ?)";
+                    }
 
+                    // insert SubCategory data
+                    else {
+                        String subCategory = category;
+                        sql = "INSERT INTO SubCategory (business_id, subCategory) VALUES (?, ?)";
                         preparedStatement = connection.prepareStatement(sql);
                         preparedStatement.setString(1, business_id);
-                        preparedStatement.setString(2, category);
+                        preparedStatement.setString(2, subCategory);
                         preparedStatement.executeUpdate();
                         preparedStatement.close();
                     }
@@ -305,8 +266,8 @@ public class Populate {
                         sb1.append(attributes1.get(key1));
                         attribute = sb1.toString();
                     }
+                    // insert attribute data
                     sql = "INSERT INTO Attribute (business_id, attribute) VALUES (?, ?)";
-
                     preparedStatement = connection.prepareStatement(sql);
                     preparedStatement.setString(1, business_id);
                     preparedStatement.setString(2, attribute);
@@ -345,8 +306,8 @@ public class Populate {
                     String openTime = (String) businessTime.get("open");
                     String closeTime = (String) businessTime.get("close");
 
+                    // insert hours data
                     sql = "INSERT INTO Hours (business_id, openDay, openTime, closeTime) VALUES (?, ?, ?, ?)";
-
                     preparedStatement = connection.prepareStatement(sql);
                     preparedStatement.setString(1, business_id);
                     preparedStatement.setString(2, openDay);
@@ -361,76 +322,6 @@ public class Populate {
         }
     }
 
-
-
-//    private static void parseBusiness() throws ParseException, IOException, SQLException, ClassNotFoundException {
-//        System.out.println("Parsing business.json file and inserting data into Business table...");
-//
-//        File file = new File(BUSINESS_JSON_FILE_PATH);
-//        JSONParser parser = new JSONParser();
-//
-//        try (FileReader fileReader = new FileReader(file);
-//             BufferedReader reader = new BufferedReader(fileReader);
-//             Connection connection = getConnect()) {
-//            String line;
-//            while ((line = reader.readLine()) != null) {
-//                JSONObject obj = (JSONObject) parser.parse(line);
-//                String business_id = (String) obj.get("business_id");
-//                String address = (String) obj.get("full_address");
-//                String city = (String) obj.get("city");
-//
-//                Integer review_count = ((Long) obj.get("review_count")).intValue();
-//                String name = (String) obj.get("name");
-//                String state = (String) obj.get("state");
-//                double stars = (double) obj.get("stars");
-//                JSONArray arr = (JSONArray) obj.get("categories");
-//                for (int i = 0; i < arr.size(); i++) {
-//                    String category = (String) arr.get(i);
-//                    if (mainCategoriesHash.contains(category)) {
-//                        mainCategories.add(new MainCategory(business_id, category));
-//                    } else {
-//                        subCategories.add(new SubCategory(business_id, category));
-//                    }
-//                }
-//                businesses.add(new Business(business_id, name, city, state, address, stars, review_count));
-//
-//                JSONObject attributes1 = (JSONObject) obj.get("attributes");
-//                for (Object okey1 : attributes1.keySet()) {
-//                    String key1 = (String) okey1;
-//                    StringBuilder sb1 = new StringBuilder(key1);
-//                    if (attributes1.get(key1) instanceof JSONObject) {
-//                        JSONObject attributes2 = (JSONObject) attributes1.get(key1);
-//                        for (Object okey2 :
-//                                attributes1.keySet()) {
-//                            String key2 = (String) okey2;
-//                            StringBuilder sb2 = new StringBuilder(key2);
-//                            sb2.append("_");
-//                            sb2.append(attributes2.get(key2));
-//                            attributes.add(new Attribute(business_id, sb1.toString() + "_" + sb2.toString()));
-//                        }
-//                    } else {
-//                        sb1.append("_");
-//                        sb1.append(attributes1.get(key1));
-//                        attributes.add(new Attribute(business_id, sb1.toString()));
-//                    }
-//                }
-//
-//                JSONObject openHours = (JSONObject) obj.get("hours");
-//                if (openHours == null) {
-//                    return;
-//                }
-//                String query = "Parse business file and insert into populate.Hours table....";
-//                for (Object okey1 : openHours.keySet()) {
-//                    String day = (String) okey1;
-//                    JSONObject businessTime = (JSONObject) openHours.get(day);
-//                    String openTime = (String) businessTime.get("open");
-//                    String closeTime = (String) businessTime.get("close");
-//                    hours.add(new Hours(business_id, day, openTime, closeTime));
-//                }
-//            }
-//        }
-//    }
-
     private static void parseAndInsertReview() throws IOException, SQLException, ClassNotFoundException {
         System.out.println("Parsing review.json file and inserting data into Review table...");
         File file = new File(REVIEW_JSON_FILE_PATH);
@@ -440,8 +331,8 @@ public class Populate {
             String line;
             String sql;
             PreparedStatement preparedStatement = null;
-
             JSONParser parser = new JSONParser();
+
             while ((line = reader.readLine()) != null) {
                 // parse review data
                 JSONObject obj = (JSONObject) parser.parse(line);
@@ -454,6 +345,7 @@ public class Populate {
                 String review_date = (String) obj.get("date");
                 String text = (String) obj.get("text");
                 String business_id = (String) obj.get("business_id");
+
                 // insert review data
                 sql = "INSERT INTO Review (votes_funny, votes_useful, votes_cool, user_id, review_id, stars, review_date, text, business_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 preparedStatement = connection.prepareStatement(sql);
@@ -464,7 +356,7 @@ public class Populate {
                 preparedStatement.setString(5, review_id);
                 preparedStatement.setInt(6, stars);
                 preparedStatement.setString(7, review_date);
-                preparedStatement.setString(8, text);
+                preparedStatement.setBytes(8, text.getBytes());
                 preparedStatement.setString(9, business_id);
                 preparedStatement.executeUpdate();
                 preparedStatement.close();
@@ -484,29 +376,28 @@ public class Populate {
             String sql;
             PreparedStatement preparedStatement = null;
             JSONParser parser = new JSONParser();
-            // parse review data
+            // parse yelp_user data
 
             while ((line = reader.readLine()) != null) {
-                // parse user data
                 JSONObject obj = (JSONObject) parser.parse(line);
                 int votes_funny = ((Long) ((JSONObject) obj.get("votes")).get("funny")).intValue();
                 int votes_useful = ((Long) ((JSONObject) obj.get("votes")).get("useful")).intValue();
                 int votes_cool = ((Long) ((JSONObject) obj.get("votes")).get("cool")).intValue();
                 String yelping_since = (String) obj.get("yelping_since");
                 int review_count = ((Long) obj.get("review_count")).intValue();
-                String name = (String) obj.get("name");
+                String user_name = (String) obj.get("name");
                 String user_id = (String) obj.get("user_id");
                 double average_stars = (double) obj.get("average_stars");
-                // insert user data
-                sql = "INSERT INTO YelpUser (votes_funny, votes_useful, votes_cool, yelping_since, review_count, name, user_id, average_stars) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
+                // insert user data
+                sql = "INSERT INTO YelpUser (votes_funny, votes_useful, votes_cool, yelping_since, review_count, user_name, user_id, average_stars) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
                 preparedStatement = connection.prepareStatement(sql);
                 preparedStatement.setInt(1, votes_funny);
                 preparedStatement.setInt(2, votes_useful);
                 preparedStatement.setInt(3, votes_cool);
                 preparedStatement.setString(4, yelping_since);
                 preparedStatement.setInt(5, review_count);
-                preparedStatement.setString(6, name);
+                preparedStatement.setString(6, user_name);
                 preparedStatement.setString(7, user_id);
                 preparedStatement.setDouble(8, average_stars);
                 preparedStatement.executeUpdate();
@@ -527,16 +418,17 @@ public class Populate {
             String sql;
             PreparedStatement preparedStatement = null;
             JSONParser parser = new JSONParser();
-            // parse review data
 
             while ((line = reader.readLine()) != null) {
-                // parse user data
+                // parse checkin data
                 JSONObject obj = (JSONObject) parser.parse(line);
                 String business_id = (String) obj.get("business_id");
                 JSONObject checkin = (JSONObject) obj.get("checkin_info");
                 for (Object okey1 : checkin.keySet()) {
                     String checkin_time = (String) okey1;
                     int checkin_number = ((Long) checkin.get(okey1)).intValue();
+
+                    // insert checkin data
                     sql = "INSERT INTO CheckIn (business_id, checkin_time, checkin_number) VALUES (?, ?, ?)";
                     preparedStatement = connection.prepareStatement(sql);
                     preparedStatement.setString(1, business_id);
@@ -551,6 +443,12 @@ public class Populate {
         }
     }
 
+    /**
+     *
+     * @return
+     * @throws SQLException
+     * @throws ClassNotFoundException
+     */
     public static Connection getConnect() throws SQLException, ClassNotFoundException {
         System.out.println("Checking JDBC...");
         Class.forName(JDBC_DRIVER);
@@ -558,6 +456,10 @@ public class Populate {
         return DriverManager.getConnection(ORACLE_URL, DB_USER, DB_PASS);
     }
 
+    /**
+     *
+     * @param args
+     */
     public static void main(String[] args) {
         new Populate().run();
     }
