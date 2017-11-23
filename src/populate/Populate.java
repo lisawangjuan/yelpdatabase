@@ -18,10 +18,10 @@ public class Populate {
     private static final String DB_PASS = "tiger";
     private static final String ORACLE_URL = "jdbc:oracle:thin:@localhost:1521:orcl5";
     private static final String JDBC_DRIVER = "oracle.jdbc.driver.OracleDriver";
-    private static final String BUSINESS_JSON_FILE_PATH = "C:\\WangJuan\\SCU\\COEN280\\assignments\\homework3\\YelpDataset\\yelp_business.json";
-    private static final String USER_JSON_FILE_PATH = "C:\\WangJuan\\SCU\\COEN280\\assignments\\homework3\\YelpDataset\\yelp_user.json";
-    private static final String REVIEW_JSON_FILE_PATH = "C:\\WangJuan\\SCU\\COEN280\\assignments\\homework3\\YelpDataset\\yelp_review.json";
-    private static final String CHECKIN_JSON_FILE_PATH = "C:\\WangJuan\\SCU\\COEN280\\assignments\\homework3\\YelpDataset\\yelp_checkin.json";
+    private static final String BUSINESS_JSON_FILE_PATH = "C:\\projects\\yelpDatabaseSystem\\yelp_business.json";
+    private static final String USER_JSON_FILE_PATH = "C:\\projects\\yelpDatabaseSystem\\yelp_user.json";
+    private static final String REVIEW_JSON_FILE_PATH = "C:\\projects\\yelpDatabaseSystem\\yelp_review.json";
+    private static final String CHECKIN_JSON_FILE_PATH = "C:\\projects\\yelpDatabaseSystem\\yelp_checkin.json";
 
     /**
      *
